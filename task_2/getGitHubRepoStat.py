@@ -16,6 +16,7 @@ import statistics
 
 BASE_URL="https://api.github.com"
 REPO_STATS_LIST = {}
+TOKEN = ""
 
 
 class Repo:
@@ -37,7 +38,7 @@ class Repo:
 def get_commits_num(user, repo):
     """Counts number of commits for a repo of choice
     """
-    response = requests.get("{base_url}/repos/{username}/{repo}/commits?per_page=1000".format(base_url=BASE_URL, username=user, repo=repo))
+    response = requests.get("{base_url}/repos/{username}/{repo}/commits?per_page=1000".format(base_url=BASE_URL, username=user, repo=repo), auth=(user, TOKEN))
     
     commits = json.loads(response.text)
 
@@ -46,7 +47,7 @@ def get_commits_num(user, repo):
 def get_branches_num(user, repo):
     """Counts number of branches for a repo of choice
     """
-    response = requests.get("{base_url}/repos/{username}/{repo}/branches".format(base_url=BASE_URL, username=user, repo=repo))
+    response = requests.get("{base_url}/repos/{username}/{repo}/branches".format(base_url=BASE_URL, username=user, repo=repo), auth=(user, TOKEN))
     
     branches = json.loads(response.text)
 
@@ -55,7 +56,7 @@ def get_branches_num(user, repo):
 def get_tags_num(user, repo):
     """Counts number of tags for a repo of choice
     """
-    response = requests.get("{base_url}/repos/{username}/{repo}/tags".format(base_url=BASE_URL, username=user, repo=repo))
+    response = requests.get("{base_url}/repos/{username}/{repo}/tags".format(base_url=BASE_URL, username=user, repo=repo), auth=(user, TOKEN))
     
     tags = json.loads(response.text)
 
@@ -64,7 +65,7 @@ def get_tags_num(user, repo):
 def get_releases_num(user, repo):
     """Counts number of releases for a repo of choice
     """
-    response = requests.get("{base_url}/repos/{username}/{repo}/releases".format(base_url=BASE_URL, username=user, repo=repo))
+    response = requests.get("{base_url}/repos/{username}/{repo}/releases".format(base_url=BASE_URL, username=user, repo=repo), auth=(user, TOKEN))
     
     releases = json.loads(response.text)
 
@@ -73,7 +74,7 @@ def get_releases_num(user, repo):
 def get_evns_num(user, repo):
     """Counts number of environments for a repo of choice
     """
-    response = requests.get("{base_url}/repos/{username}/{repo}/environments".format(base_url=BASE_URL, username=user, repo=repo))
+    response = requests.get("{base_url}/repos/{username}/{repo}/environments".format(base_url=BASE_URL, username=user, repo=repo), auth=(user, TOKEN))
     
     environments = json.loads(response.text)
 
@@ -82,9 +83,10 @@ def get_evns_num(user, repo):
 def get_closed_issues_num(user, repo):
     """Counts number of closed issues for a repo of choice
     """
-    response = requests.get("{base_url}/search/issues?q=repo:{username}/{repo}+type:issues+state:closed")
+    response = requests.get("{base_url}/search/issues?q=repo:{username}/{repo}+type:issue+state:closed".format(base_url=BASE_URL,
+                            username=user, repo=repo))
 
-    return json.loads(response.text)['total_counts']
+    return json.loads(response.text)['total_count']
 
 
 def fill_repo_stat(user, repos):
@@ -92,7 +94,6 @@ def fill_repo_stat(user, repos):
     """
     repo_objects = {}
     for repo in repos:
-        print(repo)
         repo_name = repo['name']
         repo_obj = Repo()
         repo_obj.name = repo_name
@@ -120,6 +121,7 @@ def compute_stats_median(repo_objs):
         if REPO_STATS_LIST.__sizeof__ == 0:
             for _key, _value in value.items():
                 REPO_STATS_LIST[_key] = [] 
+            print(REPO_STATS_LIST)
         for _key, _value in value.items():
             REPO_STATS_LIST[_key].append(value)
 
@@ -132,7 +134,7 @@ def get_list_of_repos(user):
     :param user: input github user name
     :return: list of all repos
     """
-    response = requests.get("{base_url}/users/{username}/repos".format(base_url=BASE_URL, username=user))
+    response = requests.get("{base_url}/users/{username}/repos".format(base_url=BASE_URL, username=user), auth=(user, TOKEN))
     repos = json.loads(response.text)
 
     return repos
@@ -209,13 +211,16 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-u', "--user", action='store')
     parser.add_argument('-a', '--action', choices=['stat', 'LOC'])
+    parser.add_argument('-t', '--token')
 
     args = parser.parse_args()
+
+    TOKEN = args.token
 
     repos = get_list_of_repos(args.user)
 
     if args.action == 'stat':
-        repos_stats = fill_repo_stat(repos, args.user)
+        repos_stats = fill_repo_stat(args.user, repos)
         compute_stats_median(repos_stats)
     elif args.action =='LOC':
         return_repo_LOC(repos, args.user)
