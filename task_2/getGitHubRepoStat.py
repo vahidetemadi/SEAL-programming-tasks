@@ -1,8 +1,9 @@
-from platform import release
+from unittest import result
 import requests
 import argparse
 import json
 import os
+import subprocess
 
 
 # This program is assumed to take the GitHub repo name,
@@ -60,6 +61,19 @@ def get_releases_num(user, repo):
 
     return len(releases)
 
+def get_evns_num(user, repo):
+    response = requests.get("{base_url}/repos/{username}/{repo}/environments".format(base_url=BASE_URL, username=user, repo=repo))
+    
+    environments = json.loads(response.text)
+
+    return len(environments)
+
+#TODO take care of closed issues
+
+def get_closed_issues_num(user, repo):
+    response = requests.get("{base_url}/search/issues?q=repo:{username}/{repo}+type:issues+state:closed")
+
+    return json.loads(response.text)['total_counts']
 
 def fill_repo_stat(user, repos):
 
@@ -75,6 +89,8 @@ def fill_repo_stat(user, repos):
         repo_obj.branches = get_branches_num(user, repo_name)
         repo_obj.releases = get_releases_num(user, repo_name)
         repo_obj.tags = get_tags_num(user, repo_name)
+        repo_obj.environments = get_evns_num(user, repo_name)
+        repo_obj.closed_issues = get_closed_issues_num(user, repo_name)
         print(json.dumps(repo_obj.__dict__))
         repo_objects[repo['name']] = repo_obj
     
@@ -96,19 +112,61 @@ def get_list_of_repos(user):
 
     return repos
 
+
+def analyze_cloc_output(message):
+    """Add information LOC, total files, blank and commented lines using CLOC for the entire repository
+    :param message: message from standard output after execution of cloc
+    :returns result: dict of the results of the analysis over a repository
+    """
+
+    results = {}
+    flag = False
+
+    for line in message.strip().split("\n"):
+        if flag:
+            if line.lower().startswith("sum"):
+                break
+            elif not line.startswith("-----"):
+                digested_split = line.split()
+                langauge, files_info = digested_split[:-4], digested_split[-4:]
+                language = " ".join(langauge)
+                total_files, blank_lines, commented_lines, loc = map(int, files_info)
+                language_result = {
+                    "total_files": total_files,
+                    "blanks": blank_lines,
+                    "comments": commented_lines,
+                    "loc": loc
+                }
+                results[language] = language_result
+
+        if line.lower().startswith("language"):
+            flag = True
+
+    return results
+
+
 def return_repo_LOC(repos, user):
     """ Takes the repo names, clones those projects and
     calls the cloc to count the LOC by that link
     """
     #create local dir named git_repos
     os.system('mkdir -p git_repos')
-    os.system('cd git_repos')
     #clone the project to local dir
     for repo in repos:
-        os.system('git clone https://github.com/{user}/{repo}.git'.format(user=user, repo=repo['name']))
+        os.system('cd git_repos && git clone https://github.com/{user}/{repo}.git'.format(user=user, repo=repo['name']))
         #call cloc for that
-        os.system('cloc {repo}/'.format(repo=repo['name']))
-    os.system('cd ..')
+        try:
+            cloc_command = ['cloc', "git_repos/{repo}".format(repo=repo['name']), '--diff-timeout', '60']
+            message = subprocess.check_output(cloc_command).decode("utf-8")
+        except subprocess.CalledProcessError as e:
+            e.output.decode('utf-8')
+        finally:
+            subprocess._cleanup()
+        print("Repo name-----------> {repo}".format(repo=repo['name']))
+        print(message)
+        results = analyze_cloc_output(message)
+        print(results)
+        #os.system('cloc {repo}/'.format(repo=repo['name']))
 
 
 
