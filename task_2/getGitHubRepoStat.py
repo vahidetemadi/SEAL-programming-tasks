@@ -1,9 +1,11 @@
+from statistics import median
 from unittest import result
 import requests
 import argparse
 import json
 import os
 import subprocess
+import statistics
 
 
 # This program is assumed to take the GitHub repo name,
@@ -13,6 +15,7 @@ import subprocess
 #       Vahid Etemadi(vetemadi87@gmail.com)
 
 BASE_URL="https://api.github.com"
+REPO_STATS_LIST = {}
 
 
 class Repo:
@@ -41,6 +44,8 @@ def get_commits_num(user, repo):
     return len(commits)
 
 def get_branches_num(user, repo):
+    """Counts number of branches for a repo of choice
+    """
     response = requests.get("{base_url}/repos/{username}/{repo}/branches".format(base_url=BASE_URL, username=user, repo=repo))
     
     branches = json.loads(response.text)
@@ -48,6 +53,8 @@ def get_branches_num(user, repo):
     return len(branches)
 
 def get_tags_num(user, repo):
+    """Counts number of tags for a repo of choice
+    """
     response = requests.get("{base_url}/repos/{username}/{repo}/tags".format(base_url=BASE_URL, username=user, repo=repo))
     
     tags = json.loads(response.text)
@@ -55,6 +62,8 @@ def get_tags_num(user, repo):
     return len(tags)
 
 def get_releases_num(user, repo):
+    """Counts number of releases for a repo of choice
+    """
     response = requests.get("{base_url}/repos/{username}/{repo}/releases".format(base_url=BASE_URL, username=user, repo=repo))
     
     releases = json.loads(response.text)
@@ -62,21 +71,25 @@ def get_releases_num(user, repo):
     return len(releases)
 
 def get_evns_num(user, repo):
+    """Counts number of environments for a repo of choice
+    """
     response = requests.get("{base_url}/repos/{username}/{repo}/environments".format(base_url=BASE_URL, username=user, repo=repo))
     
     environments = json.loads(response.text)
 
     return len(environments)
 
-#TODO take care of closed issues
-
 def get_closed_issues_num(user, repo):
+    """Counts number of closed issues for a repo of choice
+    """
     response = requests.get("{base_url}/search/issues?q=repo:{username}/{repo}+type:issues+state:closed")
 
     return json.loads(response.text)['total_counts']
 
-def fill_repo_stat(user, repos):
 
+def fill_repo_stat(user, repos):
+    """Assigns value for each stat of each repo
+    """
     repo_objects = {}
     for repo in repos:
         print(repo)
@@ -92,33 +105,44 @@ def fill_repo_stat(user, repos):
         repo_obj.environments = get_evns_num(user, repo_name)
         repo_obj.closed_issues = get_closed_issues_num(user, repo_name)
         print(json.dumps(repo_obj.__dict__))
-        repo_objects[repo['name']] = repo_obj
+        repo_objects[repo['name']] = repo_obj.__dict__
     
     return repo_objects
 
 def compute_stats_median(repo_objs):
+    """ Takes the dicts of all repos stats, merges values for each stat over all repos,
+        and offers the median per each stat over all repos
+    """
     repos_stats_median = {}
     for key, value in repo_objs.items():
-        repos_stats_median['commits_median'] = "TBC"
+        #check if total stat dict(which holds list of values for each stat) is empty
+        #and if it is, then it sould be initialized
+        if REPO_STATS_LIST.__sizeof__ == 0:
+            for _key, _value in value.items():
+                REPO_STATS_LIST[_key] = [] 
+        for _key, _value in value.items():
+            REPO_STATS_LIST[_key].append(value)
+
+    for key, value in REPO_STATS_LIST.items():
+        print("The median of stat {stat} is : {median}".format(stat=key, median=str(median(value))))
 
 
 def get_list_of_repos(user):
+    """ Gets list of all repos for a particular username (given as the program param)
+    :param user: input github user name
+    :return: list of all repos
+    """
     response = requests.get("{base_url}/users/{username}/repos".format(base_url=BASE_URL, username=user))
-
-    #log the resopnse status code
-    print("Status-->" + str(response.status_code))
-
     repos = json.loads(response.text)
 
     return repos
 
 
 def analyze_cloc_output(message):
-    """Add information LOC, total files, blank and commented lines using CLOC for the entire repository
+    """Adds information LOC, total files, blank and commented lines using CLOC for the entire repository
     :param message: message from standard output after execution of cloc
     :returns result: dict of the results of the analysis over a repository
     """
-
     results = {}
     flag = False
 
@@ -145,6 +169,16 @@ def analyze_cloc_output(message):
     return results
 
 
+def compute_LOC_median(repo_name, repo_LOC_dict):
+    """ Takes care of computing median for LOCs of all the PLs for a particular repo
+    """
+    LOCs = []
+    for key, value in repo_LOC_dict.items():
+        LOCs.append(value['loc'])
+
+    print("Median of LOCs for {repo_name} -----> {meidan}}".format(repo_name=repo_name, median=str(median(LOCs))))
+
+
 def return_repo_LOC(repos, user):
     """ Takes the repo names, clones those projects and
     calls the cloc to count the LOC by that link
@@ -166,6 +200,7 @@ def return_repo_LOC(repos, user):
         print(message)
         results = analyze_cloc_output(message)
         print(results)
+        compute_LOC_median(repo['name'], results)
         #os.system('cloc {repo}/'.format(repo=repo['name']))
 
 
