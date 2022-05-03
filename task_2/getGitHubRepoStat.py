@@ -14,7 +14,6 @@ import subprocess
 #       Vahid Etemadi(vetemadi87@gmail.com)
 
 BASE_URL="https://api.github.com"
-REPO_STATS_LIST = {}
 
 
 class Repo:
@@ -37,7 +36,7 @@ def get_commits_num(user, repo, token_username, token):
     """Counts number of commits for a repo of choice
     """
 
-    response = requests.get("{base_url}/repos/{username}/{repo}/commits".format(base_url=BASE_URL, username=user, repo=repo), auth=(token_username, token))
+    response = requests.get("{base_url}/repos/{username}/{repo}/commits".format(base_url=BASE_URL, username=user, repo=repo),auth=(token_username, token))
     
     commits = json.loads(response.text)
 
@@ -99,6 +98,7 @@ def fill_repo_stat(user, repos, token_username, token):
     """Assigns value for each stat of each repo
     """
     repo_objects = {}
+    print("Repos STATs: ")
     for repo in repos:
         repo_name = repo['name']
         repo_obj = Repo()
@@ -120,20 +120,21 @@ def compute_stats_median(repo_objs):
     """ Takes the dicts of all repos stats, merges values for each stat over all repos,
         and offers the median per each stat over all repos
     """
-    repos_stats_median = {}
+    REPO_STATS_LIST = {}
+
     for key, value in repo_objs.items():
         #check if total stat dict(which holds list of values for each stat) is empty
         #and if it is, then it sould be initialized
-        if REPO_STATS_LIST.__sizeof__ == 0:
-            for _key, _value in value.items():
-                REPO_STATS_LIST[_key] = []  
-            print(REPO_STATS_LIST)
-        for _key, _value in value.items():
-            REPO_STATS_LIST[_key].append(value)
+        if len(REPO_STATS_LIST) == 0:
+            for _key in value.keys():
+                REPO_STATS_LIST[_key] = []
 
-    print(REPO_STATS_LIST)
+        for _key, _value in value.items():
+            REPO_STATS_LIST[_key].append(_value)
+
     for key, value in REPO_STATS_LIST.items():
-        print("The median of stat {stat} is : {median}".format(stat=key, median=str(median(value))))
+        if (key != 'name'):
+            print("The median of stat {stat} is : {median}".format(stat=key, median=str(median(value))))
 
 
 def get_list_of_repos(user, token_username, token):
@@ -144,12 +145,9 @@ def get_list_of_repos(user, token_username, token):
 
     headers = {'Authorization': 'token %s' % token}
 
-    print(headers)
-    print(token)
     response = requests.get("{base_url}/users/{username}/repos".format(base_url=BASE_URL, username=user), headers=headers)
     repos = json.loads(response.text)
 
-    print(repos)
 
     return repos
 
@@ -230,9 +228,6 @@ def main():
 
 
     args = parser.parse_args()
-
-    print(args.token_username)
-    print(args.token)
 
     repos = get_list_of_repos(args.user, args.token_username, args.token)
 
