@@ -1,11 +1,10 @@
+import re
 from statistics import median
-from unittest import result
 import requests
 import argparse
 import json
 import os
 import subprocess
-import statistics
 
 
 # This program is assumed to take the GitHub repo name,
@@ -16,8 +15,6 @@ import statistics
 
 BASE_URL="https://api.github.com"
 REPO_STATS_LIST = {}
-TOKEN = ""
-USER = ""
 
 
 class Repo:
@@ -36,62 +33,69 @@ class Repo:
     environments = 0
 
 
-def get_commits_num(user, repo):
+def get_commits_num(user, repo, token_username, token):
     """Counts number of commits for a repo of choice
     """
 
-    response = requests.get("{base_url}/repos/{username}/{repo}/commits".format(base_url=BASE_URL, username=user, repo=repo), auth=(USER, TOKEN))
+    response = requests.get("{base_url}/repos/{username}/{repo}/commits".format(base_url=BASE_URL, username=user, repo=repo), auth=(token_username, token))
     
     commits = json.loads(response.text)
 
+
     return len(commits)
 
-def get_branches_num(user, repo):
+def get_branches_num(user, repo, token_username, token):
     """Counts number of branches for a repo of choice
     """
-    response = requests.get("{base_url}/repos/{username}/{repo}/branches".format(base_url=BASE_URL, username=user, repo=repo), auth=(USER, TOKEN))
+    response = requests.get("{base_url}/repos/{username}/{repo}/branches".format(base_url=BASE_URL, username=user, repo=repo), auth=(token_username, token))
     
     branches = json.loads(response.text)
 
     return len(branches)
 
-def get_tags_num(user, repo):
+def get_tags_num(user, repo, token_username, token):
     """Counts number of tags for a repo of choice
     """
-    response = requests.get("{base_url}/repos/{username}/{repo}/tags".format(base_url=BASE_URL, username=user, repo=repo), auth=(USER, TOKEN))
+    response = requests.get("{base_url}/repos/{username}/{repo}/tags".format(base_url=BASE_URL, username=user, repo=repo), auth=(token_username, token))
     
     tags = json.loads(response.text)
 
     return len(tags)
 
-def get_releases_num(user, repo):
+def get_releases_num(user, repo, token_username, token):
     """Counts number of releases for a repo of choice
     """
-    response = requests.get("{base_url}/repos/{username}/{repo}/releases".format(base_url=BASE_URL, username=user, repo=repo), auth=(USER, TOKEN))
+    response = requests.get("{base_url}/repos/{username}/{repo}/releases".format(base_url=BASE_URL, username=user, repo=repo), auth=(token_username, token))
     
     releases = json.loads(response.text)
 
     return len(releases)
 
-def get_evns_num(user, repo):
+def get_evns_num(user, repo, token_username, token):
     """Counts number of environments for a repo of choice
     """
-    response = requests.get("{base_url}/repos/{username}/{repo}/environments".format(base_url=BASE_URL, username=user, repo=repo), auth=(USER, TOKEN))
+    response = requests.get("{base_url}/repos/{username}/{repo}/environments".format(base_url=BASE_URL, username=user, repo=repo), auth=(token_username, token))
     
     environments = json.loads(response.text)
 
     return len(environments)
 
-def get_closed_issues_num(user, repo):
+def get_closed_issues_num(user, repo, token_username, token):
     """Counts number of closed issues for a repo of choice
     """
     response = requests.get("{base_url}/search/issues?q=repo:{username}/{repo}+type:issue+state:closed".format(base_url=BASE_URL,
                             username=user, repo=repo))
 
-    return json.loads(response.text)['total_count']
+    closed_issues_json = json.loads(response.text)
+
+    try:
+        num_of_closed_issues = closed_issues_json['total_count']
+        return num_of_closed_issues
+    except:
+        return 0
 
 
-def fill_repo_stat(user, repos):
+def fill_repo_stat(user, repos, token_username, token):
     """Assigns value for each stat of each repo
     """
     repo_objects = {}
@@ -101,12 +105,12 @@ def fill_repo_stat(user, repos):
         repo_obj.name = repo_name
         repo_obj.stars = repo['stargazers_count']
         repo_obj.forks = repo['forks_count']
-        repo_obj.commits = get_commits_num(user, repo_name)
-        repo_obj.branches = get_branches_num(user, repo_name)
-        repo_obj.releases = get_releases_num(user, repo_name)
-        repo_obj.tags = get_tags_num(user, repo_name)
-        repo_obj.environments = get_evns_num(user, repo_name)
-        repo_obj.closed_issues = get_closed_issues_num(user, repo_name)
+        repo_obj.commits = get_commits_num(user, repo_name, token_username, token)
+        repo_obj.branches = get_branches_num(user, repo_name, token_username, token)
+        repo_obj.releases = get_releases_num(user, repo_name, token_username, token)
+        repo_obj.tags = get_tags_num(user, repo_name, token_username, token)
+        repo_obj.environments = get_evns_num(user, repo_name, token_username, token)
+        repo_obj.closed_issues = get_closed_issues_num(user, repo_name, token_username, token)
         print(json.dumps(repo_obj.__dict__))
         repo_objects[repo['name']] = repo_obj.__dict__
     
@@ -132,13 +136,20 @@ def compute_stats_median(repo_objs):
         print("The median of stat {stat} is : {median}".format(stat=key, median=str(median(value))))
 
 
-def get_list_of_repos(user):
+def get_list_of_repos(user, token_username, token):
     """ Gets list of all repos for a particular username (given as the program param)
     :param user: input github user name
     :return: list of all repos
     """
-    response = requests.get("{base_url}/users/{username}/repos".format(base_url=BASE_URL, username=user), auth=(USER, TOKEN))
+
+    headers = {'Authorization': 'token %s' % token}
+
+    print(headers)
+    print(token)
+    response = requests.get("{base_url}/users/{username}/repos".format(base_url=BASE_URL, username=user), headers=headers)
     repos = json.loads(response.text)
+
+    print(repos)
 
     return repos
 
@@ -181,7 +192,7 @@ def compute_LOC_median(repo_name, repo_LOC_dict):
     for key, value in repo_LOC_dict.items():
         LOCs.append(value['loc'])
 
-    print("Median of LOCs for {repo_name} -----> {meidan}}".format(repo_name=repo_name, median=str(median(LOCs))))
+    print("Median of LOCs for {repo_name} -----> {median}".format(repo_name=repo_name, median=str(median(LOCs))))
 
 
 def return_repo_LOC(repos, user):
@@ -220,13 +231,13 @@ def main():
 
     args = parser.parse_args()
 
-    TOKEN = args.token
-    USER = args.token_username
+    print(args.token_username)
+    print(args.token)
 
-    repos = get_list_of_repos(args.user)
+    repos = get_list_of_repos(args.user, args.token_username, args.token)
 
     if args.action == 'stat':
-        repos_stats = fill_repo_stat(args.user, repos)
+        repos_stats = fill_repo_stat(args.user, repos, args.token, args.token_username)
         compute_stats_median(repos_stats)
     elif args.action =='LOC':
         return_repo_LOC(repos, args.user)
