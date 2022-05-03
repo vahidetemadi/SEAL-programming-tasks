@@ -17,6 +17,7 @@ import statistics
 BASE_URL="https://api.github.com"
 REPO_STATS_LIST = {}
 TOKEN = ""
+USER = ""
 
 
 class Repo:
@@ -38,7 +39,8 @@ class Repo:
 def get_commits_num(user, repo):
     """Counts number of commits for a repo of choice
     """
-    response = requests.get("{base_url}/repos/{username}/{repo}/commits?per_page=1000".format(base_url=BASE_URL, username=user, repo=repo), auth=(user, TOKEN))
+
+    response = requests.get("{base_url}/repos/{username}/{repo}/commits".format(base_url=BASE_URL, username=user, repo=repo), auth=(USER, TOKEN))
     
     commits = json.loads(response.text)
 
@@ -47,7 +49,7 @@ def get_commits_num(user, repo):
 def get_branches_num(user, repo):
     """Counts number of branches for a repo of choice
     """
-    response = requests.get("{base_url}/repos/{username}/{repo}/branches".format(base_url=BASE_URL, username=user, repo=repo), auth=(user, TOKEN))
+    response = requests.get("{base_url}/repos/{username}/{repo}/branches".format(base_url=BASE_URL, username=user, repo=repo), auth=(USER, TOKEN))
     
     branches = json.loads(response.text)
 
@@ -56,7 +58,7 @@ def get_branches_num(user, repo):
 def get_tags_num(user, repo):
     """Counts number of tags for a repo of choice
     """
-    response = requests.get("{base_url}/repos/{username}/{repo}/tags".format(base_url=BASE_URL, username=user, repo=repo), auth=(user, TOKEN))
+    response = requests.get("{base_url}/repos/{username}/{repo}/tags".format(base_url=BASE_URL, username=user, repo=repo), auth=(USER, TOKEN))
     
     tags = json.loads(response.text)
 
@@ -65,7 +67,7 @@ def get_tags_num(user, repo):
 def get_releases_num(user, repo):
     """Counts number of releases for a repo of choice
     """
-    response = requests.get("{base_url}/repos/{username}/{repo}/releases".format(base_url=BASE_URL, username=user, repo=repo), auth=(user, TOKEN))
+    response = requests.get("{base_url}/repos/{username}/{repo}/releases".format(base_url=BASE_URL, username=user, repo=repo), auth=(USER, TOKEN))
     
     releases = json.loads(response.text)
 
@@ -74,7 +76,7 @@ def get_releases_num(user, repo):
 def get_evns_num(user, repo):
     """Counts number of environments for a repo of choice
     """
-    response = requests.get("{base_url}/repos/{username}/{repo}/environments".format(base_url=BASE_URL, username=user, repo=repo), auth=(user, TOKEN))
+    response = requests.get("{base_url}/repos/{username}/{repo}/environments".format(base_url=BASE_URL, username=user, repo=repo), auth=(USER, TOKEN))
     
     environments = json.loads(response.text)
 
@@ -120,11 +122,12 @@ def compute_stats_median(repo_objs):
         #and if it is, then it sould be initialized
         if REPO_STATS_LIST.__sizeof__ == 0:
             for _key, _value in value.items():
-                REPO_STATS_LIST[_key] = [] 
+                REPO_STATS_LIST[_key] = []  
             print(REPO_STATS_LIST)
         for _key, _value in value.items():
             REPO_STATS_LIST[_key].append(value)
 
+    print(REPO_STATS_LIST)
     for key, value in REPO_STATS_LIST.items():
         print("The median of stat {stat} is : {median}".format(stat=key, median=str(median(value))))
 
@@ -134,7 +137,7 @@ def get_list_of_repos(user):
     :param user: input github user name
     :return: list of all repos
     """
-    response = requests.get("{base_url}/users/{username}/repos".format(base_url=BASE_URL, username=user), auth=(user, TOKEN))
+    response = requests.get("{base_url}/users/{username}/repos".format(base_url=BASE_URL, username=user), auth=(USER, TOKEN))
     repos = json.loads(response.text)
 
     return repos
@@ -211,11 +214,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-u', "--user", action='store')
     parser.add_argument('-a', '--action', choices=['stat', 'LOC'])
-    parser.add_argument('-t', '--token')
+    parser.add_argument('-t', '--token', action='store')
+    parser.add_argument('-un', '--token_username', action='store')
+
 
     args = parser.parse_args()
 
     TOKEN = args.token
+    USER = args.token_username
 
     repos = get_list_of_repos(args.user)
 
